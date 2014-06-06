@@ -93,7 +93,7 @@ int main(int argc, char* argv[]){
    std::stringstream ss; ss << "Random:seed = " << seed;
    cout << ss.str() << endl;
    pythia8->readString(ss.str());
-   pythia8->readString("32:m0=500");
+   pythia8->readString("32:m0=1000");
    pythia8->readString("NewGaugeBoson:ffbar2gmZZprime= on");
    pythia8->readString("Zprime:gmZmode=3");
    pythia8->readString("32:onMode = off");

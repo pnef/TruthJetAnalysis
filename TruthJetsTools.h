@@ -26,8 +26,6 @@ class TruthJetsTools {
       bool   TruthMatchDR(fastjet::PseudoJet jet, vector<fastjet::PseudoJet> TruthJets, float dR, float &truthmatchpt);
       float  dRTruth(fastjet::PseudoJet jet, vector<fastjet::PseudoJet> TruthJets, float ptThreshold);
 
-      // moment calculator 
-      float PtMoment(fastjet::PseudoJet particle, vector<fastjet::PseudoJet> &otherParticles, float sigma);
 };
 
 #endif
