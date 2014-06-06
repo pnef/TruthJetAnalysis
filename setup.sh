@@ -12,7 +12,6 @@ setup_ROOT() {
 
 setup_fastjet() {
     export FASTJETLOCATION=/u/at/pnef/Work/Code/TrackBasedGrooming/fastjet-3.0.3/fastjet-install/
-    export LD_LIBRARY_PATH=${FASTJETPATH}lib/:$LD_LIBRARY_PATH
 }
 
 setup_boost() {
