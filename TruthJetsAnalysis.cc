@@ -29,7 +29,25 @@
 
 using namespace std;
 
+// --------------------------------------------------------------
+// Fastjet Selectors ----------------------------------------------
+fastjet::Selector SelectorHSTracks() {
+    return new SelectorWorkerHSTracks();
+}
 
+fastjet::Selector SelectorPUTracks() {
+    return new SelectorWorkerPUTracks();
+}
+
+fastjet::Selector SelectorTracks() {
+    return new SelectorWorkerTracks();
+}
+
+fastjet::Selector SelectorHS() {
+    return new SelectorWorkerHS();
+}
+
+// -------------------------------------------------------------------
 // Constructor 
 TruthJetsAnalysis::TruthJetsAnalysis(){
     if(fDebug) cout << "TruthJetsAnalysis::TruthJetsAnalysis Start " << endl;
@@ -79,7 +97,7 @@ bool TruthJetsAnalysis::GetPythiaParticles(Pythia8::Pythia* pythia8, event_type 
 
         for (unsigned int ip=0; ip<pythia8->event.size(); ++ip){
 
-            int origin = -1;
+            int origin    = -1;
             if      (etype == hardscatter) origin = 0;
             else if (etype == pileup     ) origin = irun +1;
 
@@ -87,36 +105,23 @@ bool TruthJetsAnalysis::GetPythiaParticles(Pythia8::Pythia* pythia8, event_type 
             p.reset_PtYPhiM(p.pt(), p.rapidity(), p.phi(), 0.); // massless particles 
 
             // tracks: charged particles with pt>0.5 GeV, |eta|<2.4 
-            if(pythia8->event[ip].isFinal()    && 
-               fabs(pythia8->event[ip].id())  !=11  && 
-               fabs(pythia8->event[ip].id())  !=12  && 
-               fabs(pythia8->event[ip].id())  !=13  && 
-               fabs(pythia8->event[ip].id())  !=14  && 
-               fabs(pythia8->event[ip].id())  !=16  && 
-               pythia8->event[ip].isCharged()  && 
-               pythia8->event[ip].pT() > 0.5   && 
-               fabs(pythia8->event[ip].eta())<2.4){
+            if(! (pythia8->event[ip].isFinal()    && 
+                  fabs(pythia8->event[ip].id())  !=11  && 
+                  fabs(pythia8->event[ip].id())  !=12  && 
+                  fabs(pythia8->event[ip].id())  !=13  && 
+                  fabs(pythia8->event[ip].id())  !=14  && 
+                  fabs(pythia8->event[ip].id())  !=16  && 
+                  pythia8->event[ip].pT() > 0.5         ) ) continue; 
 
-                if      (origin == 0 ) {HStracks.push_back(p); p.set_user_info(new GhostUserInfo(false, false, true));}
-                else if (origin >= 1 ) {PUtracks.push_back(p); p.set_user_info(new GhostUserInfo(false, true,  true));}
+            // fill containers ------
+            bool is_track   = (fabs(p.eta())<2.4  && pythia8->event[ip].isCharged());
+            bool is_pu      = (origin >0?true:false);
+            bool is_charged = pythia8->event[ip].isCharged();
 
-            }
+            p.set_user_info(new MyUserInfo(is_pu, is_track, is_charged  ));
+            particles.push_back(p); 
 
-            if(pythia8->event[ip].isFinal()         && 
-               fabs(pythia8->event[ip].id())  !=11  && 
-               fabs(pythia8->event[ip].id())  !=12  && 
-               fabs(pythia8->event[ip].id())  !=13  && 
-               fabs(pythia8->event[ip].id())  !=14  && 
-               fabs(pythia8->event[ip].id())  !=16  && 
-               pythia8->event[ip].pT()        > 0.5  ) {
 
-               particlesForJets.push_back(p);
-
-               if(origin == 0){
-               particlesForTruthJets.push_back(p);
-               }
-
-            }
 
         }
     } // end irun loop
@@ -138,46 +143,44 @@ void TruthJetsAnalysis::AnalyzeEvent(int ievt, Pythia8::Pythia* pythia8, Pythia8
     // new event-----------------------
     fTEventNumber = ievt;
     fTNPV         = nPU;
-    particlesForJets.clear();
-    particlesForTruthJets.clear();
-    PUtracks.clear();
-    HStracks.clear();
+    particles.clear();
     
-
-
     // get new event and return if failed
     bool ok(true);
     ok = GetPythiaParticles(pythia8,   hardscatter);
     ok = GetPythiaParticles(pythia8PU, pileup,     nPU);
     if (!ok) return;
     
-    /// ------------------ Caluculate Rho ------------------------------
-    fastjet::JetMedianBackgroundEstimator bge(fastjet::SelectorAbsRapMax(1.5), fastjet::JetDefinition(fastjet::kt_algorithm,0.4), fastjet::AreaDefinition(fastjet::active_area_explicit_ghosts));
-    bge.set_particles(particlesForJets);
-    fastjet::Subtractor theSubtractor(&bge);
 
 
-    // small R jets: ATLAS Style ------------------------------------------
-    fastjet::AreaDefinition        area_def(fastjet::active_area_explicit_ghosts, fastjet::GhostedAreaSpec(5.));
-    fastjet::ClusterSequenceArea   cs(particlesForJets, fastjet::JetDefinition(fastjet::antikt_algorithm, 0.4), area_def);
+    // get pu track and hs tracks 
+    fastjet::Selector selector_hs       =  SelectorHS();
+    fastjet::Selector selector_tracks   =  SelectorTracks();
+    fastjet::Selector selector_hstracks =  selector_hs && selector_tracks;
+    fastjet::Selector selector_putracks = !selector_hs && selector_tracks;
+    vector<fastjet::PseudoJet> putracks, hstracks, dummy;
+    selector_hstracks.sift(particles, hstracks, dummy);
+    selector_putracks.sift(particles, putracks, dummy);
+    
+    /// Calculate moments 
+    for(int ip=0; ip<particles.size(); ++ip){
+        float pt_moment_hs_0p1 = tool->PtMoment(particles[ip], hstracks, 0.1); 
+        float pt_moment_pu_0p1 = tool->PtMoment(particles[ip], putracks, 0.1); 
+//        cout << particles[ip].pt() << " pu " << particles[ip].user_info<MyUserInfo>().is_pileup() << " " << pt_moment_hs_0p1 << " "  << pt_moment_pu_0p1  << endl;
 
-    fastjet::Selector sel_jets_small    = fastjet::SelectorPtMin(20) * fastjet::SelectorAbsRapMax(2.5);
+        // filling  ------------
+        if(fTNParticlesFilled == MaxNParticles) continue;
+        cout << fTNParticlesFilled << " " << MaxNParticles << endl;
+        fTParticlePt             [fTNParticlesFilled] = particles[ip].pt();
+        fTParticleEta            [fTNParticlesFilled] = particles[ip].eta();
+        fTParticlePhi            [fTNParticlesFilled] = particles[ip].phi();
+        fTParticlePtMomentPU01   [fTNParticlesFilled] = pt_moment_pu_0p1;
+        fTParticlePtMomentHS01   [fTNParticlesFilled] = pt_moment_hs_0p1;
+        fTParticleIsHS           [fTNParticlesFilled] = (particles[ip].user_info<MyUserInfo>().is_pileup()?0:1);
+        fTNParticlesFilled++;
 
-    vector<fastjet::PseudoJet> myJets_beforeSubtraction = fastjet::sorted_by_pt(cs.inclusive_jets()); //was 10
-    vector<fastjet::PseudoJet> myJets                   = sel_jets_small(theSubtractor(myJets_beforeSubtraction));
-
-    if(fDebug){ cout << ">>>>> Small R jets <<<<< " << endl;}
-    for (unsigned int ij = 0; ij < myJets.size(); ij++){
-        if(fTNJetsSmallRFilled == MaxNJetSmallR) {if(fDebug) cout << "Warning: More than " << MaxNJetSmallR << " small R jets" << endl; continue;}
-        float truthmatchpt = -1;
-
-        fTJsmallPt          [fTNJetsSmallRFilled] = myJets[ij].pt();
-        fTJsmallEta         [fTNJetsSmallRFilled] = myJets[ij].eta();
-        fTJsmallPhi         [fTNJetsSmallRFilled] = myJets[ij].phi();
-        fTJsmallM           [fTNJetsSmallRFilled] = myJets[ij].m();
-
-        fTNJetsSmallRFilled++;
     }
+
 
 
     // Fill
@@ -197,11 +200,13 @@ void TruthJetsAnalysis::DeclareBranches(){
    tT->Branch("NPV",                       &fTNPV,                    "NPV/I");
 
    // smallR jets
-   tT->Branch("NJetsFilledSmallR",         &fTNJetsSmallRFilled,       "NJetsFilledSmallR/I");
-   tT->Branch("JsmallPt",                  &fTJsmallPt,                "JsmallPt[NJetsFilledSmallR]/F");
-   tT->Branch("JsmallEta",                 &fTJsmallEta,               "JsmallEta[NJetsFilledSmallR]/F");
-   tT->Branch("JsmallPhi",                 &fTJsmallPhi,               "JsmallPhi[NJetsFilledSmallR]/F");
-   tT->Branch("JsmallM",                   &fTJsmallM,                 "JsmallM[NJetsFilledSmallR]/F");
+   tT->Branch("NParticlesFilled",          &fTNParticlesFilled,        "NParticlesFilled/I");
+   tT->Branch("ParticlePt",                &fTParticlePt,              "ParticlePt           [NParticlesFilled]/F");
+   tT->Branch("ParticleEta",               &fTParticleEta,             "ParticleEta          [NParticlesFilled]/F");
+   tT->Branch("ParticlePhi",               &fTParticlePhi,             "ParticlePhi          [NParticlesFilled]/F");
+   tT->Branch("ParticlePtMomentPU01",      &fTParticlePtMomentPU01,    "ParticlePtMomentPU01 [NParticlesFilled]/F");
+   tT->Branch("ParticlePtMomentHS01",      &fTParticlePtMomentHS01,    "ParticlePtMomentHS01 [NParticlesFilled]/F");
+   tT->Branch("ParticleIsHS",              &fTParticleIsHS,            "ParticleIsHS         [NParticlesFilled]/F");
    
    tT->GetListOfBranches()->ls();
     
@@ -214,14 +219,18 @@ void TruthJetsAnalysis::ResetBranches(){
       // reset branches 
       fTEventNumber                 = -999;
       fTNPV                         = -999;
-      fTNJetsSmallRFilled           = 0;
+      fTNParticlesFilled            = 0;
 
-      for (int iP=0; iP < MaxNJetSmallR; ++iP){
-          fTJsmallPt       [iP]= -999;
-          fTJsmallPhi      [iP]= -999;
-          fTJsmallEta      [iP]= -999;
-          fTJsmallM        [iP]= -999;
+      for (int iP=0; iP < MaxNParticles; ++iP){
+          fTParticlePt           [iP]= -999;
+          fTParticlePhi          [iP]= -999;
+          fTParticleEta          [iP]= -999;
+          fTParticleIsHS         [iP]= -999;
+          fTParticlePtMomentPU01 [iP]= -999;
+          fTParticlePtMomentHS01 [iP]= -999;
       }
 
 }
+
+
 

@@ -15,6 +15,7 @@
 #include "TRandom3.h"
 #include "TError.h"
 #include "TVector3.h"
+#include "TMath.h"
 
 using namespace std;
 
@@ -22,6 +23,18 @@ using namespace std;
 TruthJetsTools::TruthJetsTools(){
 }
 
+
+// Pt Moment calculator
+float TruthJetsTools::PtMoment(fastjet::PseudoJet particle, vector<fastjet::PseudoJet> &otherParticles, float sigma){
+
+    float sum = 0;
+    for(int ip=0; ip<otherParticles.size(); ++ip){
+        if(particle == otherParticles[ip]) continue; 
+        sum  += otherParticles[ip].pt() * TMath::Gaus(otherParticles[ip].delta_R(particle), 0, sigma, false);
+    }
+
+    return sum;
+}
 
 // matching to truth jets: return true if dR to closest truth jet < dR
 bool TruthJetsTools::TruthMatchDR(fastjet::PseudoJet jet, vector<fastjet::PseudoJet> TruthJets, float dR, float& truthmatchpt){

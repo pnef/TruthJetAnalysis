@@ -52,10 +52,7 @@ class TruthJetsAnalysis{
         
         TruthJetsTools *tool;
 
-        std::vector <fastjet::PseudoJet>           particlesForJets;
-        std::vector <fastjet::PseudoJet>           particlesForTruthJets;
-        std::vector <fastjet::PseudoJet>           PUtracks;
-        std::vector <fastjet::PseudoJet>           HStracks;
+        std::vector <fastjet::PseudoJet>           particles;
 
         TFile *tF;
         TTree *tT;
@@ -64,13 +61,15 @@ class TruthJetsAnalysis{
         int              fTEventNumber;
         int              fTNPV;
 
-        static const int MaxNJetSmallR = 20;
+        static const int MaxNParticles = 5000;
     
-        int              fTNJetsSmallRFilled;
-        float            fTJsmallPt        [MaxNJetSmallR];
-        float            fTJsmallEta       [MaxNJetSmallR];
-        float            fTJsmallPhi       [MaxNJetSmallR];
-        float            fTJsmallM         [MaxNJetSmallR];
+        int              fTNParticlesFilled;
+        float            fTParticlePt              [MaxNParticles];
+        float            fTParticleEta             [MaxNParticles];
+        float            fTParticlePhi             [MaxNParticles];
+        float            fTParticleIsHS            [MaxNParticles];
+        float            fTParticlePtMomentPU01    [MaxNParticles];
+        float            fTParticlePtMomentHS01    [MaxNParticles];
 
     
 
