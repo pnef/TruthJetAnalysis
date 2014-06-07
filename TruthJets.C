@@ -20,16 +20,20 @@
 #include "TruthJetsTools.h"
 #include "TruthJetsAnalysis.h"
 
-#include "boost/program_options.hpp"
 
 #include "TRandom3.h"
+
+#if boostflag==1
+#include "boost/program_options.hpp"
+namespace po = boost::program_options;
+#endif
 
 using std::cout;
 using std::endl;
 using std::string;
 using std::map;
 using namespace std;
-namespace po = boost::program_options;
+
 
 int getSeed(int optSeed){
     if (optSeed > -1) return optSeed;
@@ -54,6 +58,7 @@ int main(int argc, char* argv[]){
     string infile = "/u/at/pnef/Work/Code/MadGraph/MG5_aMC_v2_0_1/HP_tt_20140314/Events/run_01/unweighted_events.lhe";
     string outName = "TopToHc.root";
 
+    #if boostflag==1 // command line parsing if boost is installed 
     po::options_description desc("Allowed options");
     desc.add_options()
       ("help", "produce help message")
@@ -74,6 +79,7 @@ int main(int argc, char* argv[]){
         return 1;
     }
     //------
+    #endif
 
 
    seed = getSeed(seed);

@@ -17,6 +17,7 @@ setup_fastjet() {
 setup_boost() {
     export BOOSTINCDIR=/usr/include
     export BOOSTLIBLOCATION=/usr/lib64
+    export BOOSTSETUP=0
 }
 
 # setup_ROOT
